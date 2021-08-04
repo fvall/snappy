@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "snappy"
+version = "0.1.0"
+description = "A backup snapshot tool using rsync"
+authors = ["Felipe Valladão <felipe.valladao@gmail.com>"]
+license = "GPL-3-only"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^3.9.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
