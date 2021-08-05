@@ -1,13 +1,13 @@
 import os
 import subprocess
-from .utils import substitute_tilde
+from .cmd import _fs_cmd_args
 
 
-class NoRsync(Exception):
+class NoRsyncError(FileNotFoundError):
     pass
 
 
-def has_rsync_installed() -> bool:
+def is_rsync_installed() -> bool:
     cmd = ["rsync", "--version"]
     out = subprocess.run(cmd, stdout = subprocess.DEVNULL, capture_output = False)
     return (out.returncode == 0)
@@ -15,22 +15,11 @@ def has_rsync_installed() -> bool:
 
 def rsync(src, dst, options = None):
 
-    if options is None:
-        options = []
-    
+    args = _fs_cmd_args(src, dst, options)
     default = "-av"
-    opt = [default] + options
 
-    # - substitute "~" for home directory
-
-    src = substitute_tilde(src)
-    dst = substitute_tilde(dst)
-    
-    # - paths should be absolute
-    
-    src = os.path.abspath(src)
-    dst = os.path.abspath(dst)
-
-    cmd = ["rsync"] + opt + [src, dst]
+    opt = [default] + args.options
+    cmd = ["rsync"] + opt + [args.src, args.dst]
     out = subprocess.run(cmd, capture_output = True)
+
     return out
