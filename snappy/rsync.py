@@ -8,8 +8,8 @@ class NoRsyncError(FileNotFoundError):
 
 
 def is_rsync_installed() -> bool:
-    cmd = ["rsync", "--version"]
-    out = subprocess.run(cmd, stdout = subprocess.DEVNULL, capture_output = False)
+    cmd = ["which", "rsync"]
+    out = subprocess.run(cmd, capture_output = True)
     return (out.returncode == 0)
 
 
