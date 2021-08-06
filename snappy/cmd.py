@@ -1,7 +1,6 @@
-import os
 import subprocess
 import shutil
-from .utils import substitute_tilde
+from .utils import normalize_path
 
 
 class FsCmdArgs:
@@ -18,15 +17,8 @@ def _fs_cmd_args(src, dst, options = None):
     if options is None:
         options = []
 
-    # - substitute "~" for home directory
-
-    src = substitute_tilde(src)
-    dst = substitute_tilde(dst)
-    
-    # - paths should be absolute
-    
-    src = os.path.abspath(src)
-    dst = os.path.abspath(dst)
+    src = normalize_path(src)
+    dst = normalize_path(dst)
 
     return FsCmdArgs(src, dst, options)
 
