@@ -1,9 +1,12 @@
-import os
 import subprocess
 from .cmd import _fs_cmd_args
 
 
 class NoRsyncError(FileNotFoundError):
+    pass
+
+
+class RsyncError(RuntimeError):
     pass
 
 
