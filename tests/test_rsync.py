@@ -44,7 +44,10 @@ class TestRsync(unittest.TestCase):
         dst = os.path.join(self.test_folder.name, "folder_dst")
         output = rsync.rsync(folder1, dst, ["-a"])
 
-        self.assertTrue(filecmp.cmpfiles(folder1, dst, ["file1.txt", "file2.txt"]))
+        files = ["file1.txt", "file2.txt"]
+        files = [os.path.join(fd, fl) for fl, fd in zip(files, [folder1, folder2])]
+        match, mismatch, errors = filecmp.cmpfiles(folder1, dst, files)
+        self.assertEqual(files, match)
         self.assertEqual(output.returncode, 0)
 
     def test_rsync_folder_contents(self):
@@ -67,8 +70,14 @@ class TestRsync(unittest.TestCase):
         dst = os.path.join(self.test_folder.name, "folder_dst")
         os.makedirs(dst)
 
-        output = rsync.rsync(folder1c + "/", dst + "/", ["-a"])
-        self.assertTrue(filecmp.cmpfiles(folder1c, dst, ["file1.txt", "file2.txt"]))
+        output = rsync.rsync(folder1c + os.path.sep, dst + os.path.sep, ["-a"])
+        files = [
+            os.path.join(folder1c, "file1.txt"),
+            os.path.join(folder1c, folder2c, "file2.txt")
+        ]
+
+        match, mismatch, errors = filecmp.cmpfiles(folder1c, dst, files)
+        self.assertEqual(files, match)
         self.assertEqual(output.returncode, 0)
 
     def test_rsync_check(self):
