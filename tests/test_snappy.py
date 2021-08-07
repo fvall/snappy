@@ -137,7 +137,7 @@ class TestCreateSnapshot(unittest.TestCase):
         src += [os.path.join(self.folder.name, "ThisFolderIsNotThere")]
 
         with tempfile.TemporaryDirectory() as dst:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(FileNotFoundError):
                 snp.create_snapshot(src, dst)
         
     def test_expand_tilde(self):
