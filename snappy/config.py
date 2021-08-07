@@ -1,8 +1,10 @@
 import os
+import logging
 import configparser
 
 loc = os.path.abspath(__file__)
 default_config_loc = os.path.join(os.path.dirname(loc), "assets", "snappy.ini")
+logger = logging.getLogger(__name__)
 
 
 def config_loc() -> str:
@@ -12,15 +14,21 @@ def config_loc() -> str:
 def create_config() -> None:
 
     loc = config_loc()
+    logger.info(f"Creating config file in {loc}")
     os.makedirs(loc, exist_ok = True)
 
     file = os.path.join(loc, "snappy.ini")
     if os.path.exists(file):
+        logger.info("Configuration file already exists")
+        logger.info("Skipping file creation")
         return None
     
     with open(file, "w") as fw:
         with open(default_config_loc, "r") as fr:
             fw.write(fr.read())
+    
+    logger.info("Configuration file created")
+    return None
 
 
 def read_config() -> configparser.ConfigParser:
