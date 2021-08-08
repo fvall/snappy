@@ -233,7 +233,7 @@ def cli():
 
     # -- dry-run argument
 
-    default = True
+    default = False
     action = "store_true"
     help = "perform trial run without making any changes (disables quiet)"
     snap.add_argument("--dry-run", default = default, action = action, help = help)
