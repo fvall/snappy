@@ -7,6 +7,18 @@ default_config_loc = os.path.join(os.path.dirname(loc), "assets", "snappy.ini")
 logger = logging.getLogger(__name__)
 
 
+class ConfigNotFoundError(FileNotFoundError):
+    pass
+
+
+class ConfigReadError(RuntimeError):
+    pass
+
+
+class InvalidConfigError(ValueError):
+    pass
+
+
 def config_loc() -> str:
     return os.path.join(os.environ["HOME"], ".config", "snappy")
 
@@ -36,7 +48,9 @@ def read_config() -> configparser.ConfigParser:
     loc = config_loc()
     file = os.path.join(loc, "snappy.ini")
     if not os.path.exists(file):
-        raise FileNotFoundError(f"Cannot find snappy config folder {loc}")
+        logger.error(f"Cannot find snappy config folder {loc}")
+        logger.error("Please create one with `snappy config --create`")
+        raise ConfigNotFoundError(f"Cannot find snappy config folder {loc}")
     
     cfg = configparser.ConfigParser(
         interpolation = configparser.ExtendedInterpolation(),
@@ -48,7 +62,7 @@ def read_config() -> configparser.ConfigParser:
     try:
         cfg.read(file)
     except Exception as err:
-        raise RuntimeError("Cannot read config file") from err
+        raise ConfigReadError("Cannot read config file") from err
 
     return cfg
 

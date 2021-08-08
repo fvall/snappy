@@ -40,10 +40,11 @@ def create_snapshot(sources: list, destination: os.PathLike, rsync_args = None) 
     for src in sources:
 
         src = ut.normalize_path(src)
-        logger.info(f"Backing up {src}")
-        
+        ftype = "folder" if os.path.isdir(src) else "file"
+        logger.info(f"Backing up {ftype} {src}")
+
         if not os.path.exists(src):
-            logger.error(f"Folder {src} cannot be found")
+            logger.error(f"{ftype.capitalize()} {src} cannot be found")
             logger.error("Stopping snapshot")
             raise FileNotFoundError(f"Location {src} cannot be found. Stopping snapshot creation.")
         
@@ -62,7 +63,7 @@ def create_snapshot(sources: list, destination: os.PathLike, rsync_args = None) 
             logger.error(f"Error code: {output.returncode}")
             raise RsyncError(error_msg)
         
-        msg = f"Folder {src} backed up!"
+        msg = f"{ftype.capitalize()} {src} backed up!"
         logger.info(msg)
         logger.info("-" * len(msg))
 
@@ -104,7 +105,7 @@ def snap_backup(sources: list, backup_folder: os.PathLike, max_backups = 3, rsyn
             logger.info(f"Attempting to link snapshot files to {backups[-1]}")
             rsync_args.append(f"--link-dest={backups[-1]}")
         
-        logger.info("Initiating snapshot creation")
+        logger.info("Creating backup snapshot...")
         create_snapshot(sources, tmp, rsync_args)
     
     except Exception as err:
@@ -139,6 +140,9 @@ def clean_backups(path: os.PathLike, n: int) -> None:
         for bk in backups[n:]:
             logger.info(f"Removing backup {os.path.basename(bk)}")
             shutil.rmtree(bk)
+    else:
+        logger.info("No old backups to remove")
+
 
 # ---------------------
 #  Internal functions
