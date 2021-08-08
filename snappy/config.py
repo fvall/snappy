@@ -99,4 +99,18 @@ def is_valid_config(cfg) -> bool:
         except ValueError:
             return False
 
+    # --> must have rsync.exclude section
+
+    try:
+        list(cfg["rsync.exclude"].keys())
+    except KeyError:
+        return False
+    
+    # --> must have rsync.include section
+
+    try:
+        list(cfg["rsync.include"].keys())
+    except KeyError:
+        return False
+
     return True
