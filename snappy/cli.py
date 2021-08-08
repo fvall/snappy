@@ -73,24 +73,61 @@ def run_backup(verbose = True, dry_run = True) -> None:
         logger.error(msg)
         raise cfg.InvalidConfigError(msg)
     
+    # -------------------------
+    #  Source and destination
+    # -------------------------
+
     dst = config["Destination"]["folder"]
     src = config["Sources"].keys()
     src = filter(lambda x: x is not None, src)
     src = filter(lambda x: x != "", src)
-    src = list(src)
+    src = filter(lambda x: not is_comment(x), src)
+    src = [s.strip() for s in src]
+    dst = dst.strip()
 
-    size = list(config["backup.quantity"].keys())
+    # ------------------------
+    #  Number of max backups
+    # ------------------------
+
+    size = [k for k in config["backup.quantity"].keys() if not is_comment(k)]
     size = size[0] if size else 0
-    size = int(size)
+    size = int(size.strip())
+
+    # ------------------------------
+    #  Process extra args to rsync
+    # ------------------------------
+
+    args = []
+
+    # - rsync exclude patterns
+
+    rsync_exclude = _process_rsync_patterns(config, "rsync.exclude")
+    for idx, e in enumerate(rsync_exclude):
+        rsync_exclude[idx] = f"--exclude={ut.substitute_tilde(e)}"
+
+    args += rsync_exclude
+
+    # - rsync include patterns
+
+    rsync_include = _process_rsync_patterns(config, "rsync.include")
+    for idx, e in enumerate(rsync_include):
+        rsync_include[idx] = f"--include={ut.substitute_tilde(e)}"
+
+    args += rsync_include
+
+    # - Dry run
+
+    if dry_run:
+        args.append("--dry-run")
+
+    # ---------------
+    #  Start backup
+    # ---------------
 
     now = datetime.datetime.now()
     msg = f"Starting backup on {now.strftime('%d-%b-%Y')} at {now.strftime('%H:%M:%S')}"
     logger.info(msg)
     logger.info("=" * len(msg))
-
-    args = []
-    if dry_run:
-        args.append("--dry-run")
 
     try:
         snp.snap_backup(src, dst, size, args)
@@ -329,3 +366,21 @@ def _stream_handler() -> logging.StreamHandler:
     hl.setFormatter(fmt)
 
     return hl
+
+
+def _process_rsync_patterns(config, section):
+    
+    patt = list(config[section].keys())
+    patt_list = []
+    for e in patt:
+        if e != "" and (not is_comment(e)):
+            patt_list.append(e.strip())
+    
+    return patt
+
+
+def is_comment(s):
+
+    # - Something is a comment if it starts with #
+
+    return s[0] == "#"
