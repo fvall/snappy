@@ -28,8 +28,9 @@ def rsync(src, dst, options = None):
 
     opt = [default] + args.options
     cmd = ["rsync"] + opt + [args.src, args.dst]
+    logger.debug(f"Running command {cmd}")
+
     out = subprocess.Popen(cmd, stdout = PIPE, stderr = PIPE, encoding = "utf8")
-    
     now = datetime.datetime.now()
     while True:
 
