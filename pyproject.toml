@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "A backup snapshot tool using rsync"
 authors = ["Felipe Valladão <felipe.valladao@gmail.com>"]
 license = "GPL-3-only"
+readme = "README.md"
+include = [
+    "./snappy/assets/snappy.ini"
+]
 
 [tool.poetry.dependencies]
 python = "^3.6"
@@ -13,6 +17,8 @@ flake8 = "^3.9.2"
 pytest = "^6.2.4"
 pytest-cov = "^2.12.1"
 
+[tool.poetry.scripts]
+snappy = "snappy.cli:cli"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

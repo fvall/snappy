@@ -1,7 +1,9 @@
+import os
 import io
 import logging
 import datetime
 import argparse
+from .rsync import RsyncError
 from . import config as cfg
 from . import snappy as snp
 from . import utils as ut
@@ -63,9 +65,13 @@ def config_path() -> None:
 
 def run_backup(verbose = True, dry_run = True) -> None:
     
+    _configure_logger(verbose)
+
     config = cfg.read_config()
     if not cfg.is_valid_config(config):
-        raise ValueError("Config file is invalid. Please fix the file and try again.")
+        msg = "Config file is invalid. Please fix the file and try again."
+        logger.error(msg)
+        raise cfg.InvalidConfigError(msg)
     
     dst = config["Destination"]["folder"]
     src = config["Sources"].keys()
@@ -76,8 +82,6 @@ def run_backup(verbose = True, dry_run = True) -> None:
     size = list(config["backup.quantity"].keys())
     size = size[0] if size else 0
     size = int(size)
-    
-    _configure_logger(verbose)
 
     now = datetime.datetime.now()
     msg = f"Starting backup on {now.strftime('%d-%b-%Y')} at {now.strftime('%H:%M:%S')}"
@@ -88,14 +92,19 @@ def run_backup(verbose = True, dry_run = True) -> None:
     if dry_run:
         args.append("--dry-run")
 
-    snp.snap_backup(src, dst, size, args)
+    try:
+        snp.snap_backup(src, dst, size, args)
+    except Exception as err:
+        msg = "There was an error when creating the backup"
+        logger.error(msg)
+        raise RsyncError(msg) from err
 
 # --------------
 #  CLI program
 # --------------
 
 
-def cli_config(show = True, path = False, create = False, **kws):
+def cli_config(show: bool = True, path: bool = False, create: bool = False, **kws) -> int:
 
     if show:
         show_config()
@@ -106,44 +115,111 @@ def cli_config(show = True, path = False, create = False, **kws):
     if create:
         create_config()
 
+    return 0
 
-def cli_snap(verbose = True, dry_run = True, **kws):
-    verbose = True if dry_run else verbose
-    run_backup(verbose = verbose, dry_run = dry_run)
+
+def cli_snap(quiet: bool = False, dry_run: bool = True, **kws) -> int:
+    
+    verbose = True if dry_run else (not quiet)
+    try:
+        run_backup(verbose = verbose, dry_run = dry_run)
+    except cfg.ConfigReadError:
+        return 1
+    except cfg.ConfigNotFoundError:
+        return 1
+    except cfg.InvalidConfigError:
+        return 1
+    except snp.RsyncError:
+        return 2
+    
+    return 0
 
 
 def cli():
     
-    parser = argparse.ArgumentParser(description = 'Snappy - create backup snapshots with rsync', prog = "snappy")
-    subparser = parser.add_subparsers(prog = "snappy")
+    # -----------------------
+    #  Parser and subparser
+    # -----------------------
+
+    description = '''Snappy - backup snapshots with rsync
+    ====================================
+
+    Create backup snapshots based on config file specification. There are two commands:
+    * snap --- create snapshots
+    * config --- config utilities
+
+    Each command has its dedicated section. You can use snappy [COMMAND] -h to show the description of each command.
+    Logs are saved in $HOME/.logs/snappy if the process can write to that location.
+    '''
+
+    description = description.replace("\n    ", "\n")
+    description = description.replace("* ", "    * ")
+
+    prog = "snappy"
+    parser = argparse.ArgumentParser(
+        description = description,
+        prog = prog,
+        formatter_class = argparse.RawTextHelpFormatter
+    )
+
+    def helper(**kws):
+        parser.print_help()
+        return 0
+    
+    parser.set_defaults(func = helper)
+    subparser = parser.add_subparsers(prog = "snappy", title = "commands")
 
     # ---------------
     #  Snap command
     # ---------------
 
-    description = "Create backup snapshot"
-    snap = subparser.add_parser("snap", description = description)
+    description = "Create backup snapshot\n======================"
+    epilog = """This command creates a backup snapshot based on the configuration file
+    * You can disable the backup steps by using the option --quiet. This still saves the logs to a file.
+    * If you would like to test the tool you can use the option --dry-run. This will print the backup steps, but no backup will be created.
+    """
+
+    snap = subparser.add_parser(
+        "snap",
+        description = description,
+        epilog = epilog,
+        formatter_class = argparse.RawTextHelpFormatter
+    )
     snap.set_defaults(func = cli_snap)
+
+    # -- quiet argument
+
+    default = False
+    action = "store_true"
+    help = "don't show steps while backing up"
+    snap.add_argument("-q", "--quiet", default = default, action = action, help = help)
 
     # -- dry-run argument
 
     default = True
     action = "store_true"
-    help = "perform trial run without making any changes (sets verbose to true)"
+    help = "perform trial run without making any changes (disables quiet)"
     snap.add_argument("--dry-run", default = default, action = action, help = help)
-
-    # -- verbose argument
-
-    default = False
-    action = "store_true"
-    help = "show information while backing up"
-    snap.add_argument("-v", "--verbose", default = default, action = action, help = help)
 
     # ----------------
     #  Config command
     # ----------------
 
-    config = subparser.add_parser("config", description = "Snappy backup configuration", usage = "%(prog)s [options]", epilog = "AAAAA BBBBB CCCC\nDDDDD EEEEE")
+    description = "Snappy backup configuration\n==========================="
+    usage = "%(prog)s [options]"
+    epilog = """Use this command to manage the configuration file
+    * You can create a default configuration file if one does not exist. This does not overwrite an existing configuration file.
+    * You can also show the configuration without opening the file, which is handy if you are already in terminal.
+    * If you forgot where the file is saved, you can print the file path as well.
+    """
+
+    config = subparser.add_parser(
+        "config",
+        description = description,
+        usage = usage,
+        epilog = epilog,
+        formatter_class = argparse.RawTextHelpFormatter
+    )
     config.set_defaults(func = cli_config)
     
     # - show argument
@@ -175,10 +251,7 @@ def cli():
     # -------------
 
     args = parser.parse_args()
-    print(args)
-    args.func(**vars(args))
-
-    return args
+    return args.func(**vars(args))
 
 # ---------------------
 #  Internal functions
@@ -188,23 +261,71 @@ def cli():
 def _configure_logger(verbose = True) -> None:
     
     logger.setLevel(logging.INFO)
-    hl = logging.StreamHandler()
-    hl.set_name("Console")
-    fmt = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    hl.setFormatter(fmt)
-    if verbose:
-        hl.setLevel(logging.INFO)
-    else:
-        hl.setLevel(logging.WARNING)
 
-    add_handler = True
+    # -----------------
+    #  Log to console
+    # -----------------
+
+    chl = _stream_handler()
+    if verbose:
+        chl.setLevel(logging.INFO)
+    else:
+        chl.setLevel(logging.WARNING)
+
+    # --------------
+    #  Log to file
+    # --------------
+
+    fhl = _file_handler()
+
+    # -----------------------------------------
+    #  Check if we need to update the handlers
+    # -----------------------------------------
+
+    add_handler = {
+        "Console" : chl,
+        "File" : fhl
+    }
+
     if logger.hasHandlers():
         
         for idx, lhl in enumerate(logger.handlers):
-            if lhl.get_name() == "Console":
-                logger.handlers[idx] = hl
-                add_handler = False
-                break
+            if lhl.get_name() in add_handler:
+                logger.handlers[idx] = add_handler[lhl.get_name()]
+                add_handler.pop(lhl.get_name())
     
     if add_handler:
-        logger.addHandler(hl)
+        for hl in add_handler.values():
+            logger.addHandler(hl)
+
+
+def _file_handler() -> logging.FileHandler:
+
+    loc = os.path.join(os.environ["HOME"], ".logs", "snappy")
+    today = datetime.date.today()
+    file = today.strftime("%Y-%m-%d") + ".log"
+
+    if not os.path.exists(loc):
+        try:
+            os.makedirs(loc)
+        except Exception as err:
+            msg = f"Cannot create log directory {loc}"
+            raise RuntimeError(msg) from err
+    
+    file = os.path.join(loc, file)
+    hl = logging.FileHandler(file, encoding = "utf8")
+    hl.set_name("File")
+    fmt = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    hl.setFormatter(fmt)
+
+    return hl
+
+
+def _stream_handler() -> logging.StreamHandler:
+
+    hl = logging.StreamHandler()
+    hl.set_name("Console")
+    fmt = logging.Formatter("%(message)s")
+    hl.setFormatter(fmt)
+
+    return hl
