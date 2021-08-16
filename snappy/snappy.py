@@ -154,7 +154,9 @@ def _log_rsync_error(cmd_output: subprocess.Popen) -> str:
     logger.error("There was an error when running the backup")
     logger.error("Error message")
 
-    error_msg = cmd_output.stderr.readlines()
+    stdout = cmd_output.stdout.readlines()
+    stderr = cmd_output.stderr.readlines()
+    error_msg = stderr if stderr else stdout
     msg = error_msg.split("\n")
     for m in msg:
         if (m != "") and (m != "\n") and (m != "\n\n"):
