@@ -138,6 +138,7 @@ def run_backup(verbose = True, dry_run = True) -> None:
         raise RsyncError(msg) from err
 
     _compress_log(logger, backup_folder)
+    logger.info("Backup complete!")
 
 # --------------
 #  CLI program

@@ -130,7 +130,7 @@ def snap_backup(sources: list, backup_folder: os.PathLike, max_backups = 3, rsyn
 
     logger.info("Cleaning old backups")
     clean_backups(backup_folder, max_backups)
-    return new
+    return os.path.basename(new)
 
 
 def clean_backups(path: os.PathLike, n: int) -> None:
