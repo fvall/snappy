@@ -139,8 +139,6 @@ def run_backup(verbose = True, dry_run = True) -> None:
 
     _compress_log(logger, backup_folder)
 
-    return backup_folder
-
 # --------------
 #  CLI program
 # --------------
@@ -383,9 +381,13 @@ def _compress_log(lg, name) -> None:
 
             name = os.path.join(os.path.dirname(file), name)
             name += ".log"
+            lg.info("Moving file '{}' to '{}'".format(file, name))
             mv(file, name)
+            
+            lg.info("Compressing file '{}'".format(name))
             cmd = ["gzip", "--best", '{}'.format(name)]
             try:
+                lg.info("Running command '{}'".format(" ".join(cmd)))
                 out = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
             except Exception:
                 lg.error("Could not compress log file '{}'".format(file))
