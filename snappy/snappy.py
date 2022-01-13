@@ -68,7 +68,7 @@ def create_snapshot(sources: list, destination: os.PathLike, rsync_args = None) 
         logger.info("-" * len(msg))
 
 
-def snap_backup(sources: list, backup_folder: os.PathLike, max_backups = 3, rsync_args = None) -> None:
+def snap_backup(sources: list, backup_folder: os.PathLike, max_backups = 3, rsync_args = None) -> str:
     
     # - If rsync is not installed, abort
 
@@ -120,12 +120,17 @@ def snap_backup(sources: list, backup_folder: os.PathLike, max_backups = 3, rsyn
 
     # - if it succeeds, we rename tmp file and clean old backups
 
+    if "--dry-run" in rsync_args:
+        shutil.rmtree(tmp)
+        return new
+
     new = os.path.join(backup_folder, new)
     logger.info(f"Moving temporary folder {tmp} to {new}")
     mv(tmp, new)
 
     logger.info("Cleaning old backups")
     clean_backups(backup_folder, max_backups)
+    return new
 
 
 def clean_backups(path: os.PathLike, n: int) -> None:
