@@ -3,11 +3,12 @@ import io
 import logging
 import datetime
 import argparse
+import subprocess
 from .rsync import RsyncError
+from .cmd import mv
 from . import config as cfg
 from . import snappy as snp
 from . import utils as ut
-
 
 logger = logging.getLogger("snappy")
 
@@ -130,11 +131,15 @@ def run_backup(verbose = True, dry_run = True) -> None:
     logger.info("=" * len(msg))
 
     try:
-        snp.snap_backup(src, dst, size, args)
+        backup_folder = snp.snap_backup(src, dst, size, args)
     except Exception as err:
         msg = "There was an error when creating the backup"
         logger.error(msg)
         raise RsyncError(msg) from err
+
+    _compress_log(logger, backup_folder)
+
+    return backup_folder
 
 # --------------
 #  CLI program
@@ -366,6 +371,32 @@ def _stream_handler() -> logging.StreamHandler:
     hl.setFormatter(fmt)
 
     return hl
+
+
+def _compress_log(lg, name) -> None:
+
+    for hl in lg.handlers:
+        if hl.get_name() == "File":
+            file = hl.baseFilename
+            if not os.path.exists(file):
+                return None
+
+            name = os.path.join(os.path.dirname(file), name)
+            name += ".log"
+            mv(file, name)
+            cmd = ["gzip", "--best", '{}'.format(name)]
+            try:
+                out = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+            except Exception:
+                lg.error("Could not compress log file '{}'".format(file))
+                mv(name, file)
+                return
+
+            if out.returncode != 0:
+                lg.error("Could not compress log file '{}'".format(file))
+                mv(name, file)
+            
+            return None
 
 
 def _process_rsync_patterns(config, section):
