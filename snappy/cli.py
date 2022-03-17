@@ -407,7 +407,7 @@ def _process_rsync_patterns(config, section):
     patt = list(config[section].keys())
     patt_list = []
     for e in patt:
-        if e != "" and (not is_comment(e)):
+        if e.strip() != "" and (not is_comment(e)):
             patt_list.append(e.strip())
     
     return patt
