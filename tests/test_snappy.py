@@ -1,4 +1,6 @@
 import os
+import sys
+import time
 import stat
 import unittest
 import tempfile
@@ -148,7 +150,7 @@ class TestCreateSnapshot(unittest.TestCase):
             f.write("This is file C")
 
     def setUp(self) -> None:
-        self.folder = tempfile.TemporaryDirectory()
+        self.folder = tempfile.TemporaryDirectory(dir = ".")
         self.sources = ["A", "B"]
         self.create_test_folders(self.folder.name)
 
@@ -204,3 +206,76 @@ class TestCreateSnapshot(unittest.TestCase):
                 match, mismatch, errors = filecmp.cmpfiles(self.folder.name, dst, files)
 
         self.assertEqual(match, files)
+
+    def test_snapshot_with_bad_permissions(self):
+
+        files = [
+            "A/a.txt",
+            "B/b.txt",
+            "B/bad.txt",
+            "B/C/c.txt",
+            "B/C/bad.txt",
+            "C/c.txt",
+            "C/D/E/bad.txt",
+            "D/d.txt"
+        ]
+        with tempfile.TemporaryDirectory(dir = ".") as src:
+            src = os.path.abspath(src)
+            os.makedirs(os.path.join(src, "A"))
+            os.makedirs(os.path.join(src, "B"))
+            os.makedirs(os.path.join(src, "B", "C"))
+            os.makedirs(os.path.join(src, "C", "D", "E"))
+            os.makedirs(os.path.join(src, "D"))
+
+            for file in files:
+                file = os.path.join(src, file)
+                with open(file, "w") as f:
+                    f.write("abcd")
+
+                if os.path.basename(file) == "bad.txt":
+                    os.chmod(file, stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+
+            with tempfile.TemporaryDirectory(dir = ".") as dst:
+                dst = os.path.abspath(dst)
+                if src[-1] != os.path.sep:
+                    src += os.path.sep
+
+                snp.create_snapshot([src], dst)
+                copied = os.listdir(dst)
+                copied = [os.path.join(dst, c) for c in copied]
+
+                has_dir = True
+                while has_dir:
+                    for idx, c in enumerate(copied):
+                        has_dir = os.path.isdir(c)
+                        if has_dir and (len(os.listdir(c)) > 0):
+                            break
+                    else:
+                        break
+
+                    # - swap and replace
+
+                    last = copied.pop()
+                    if idx < len(copied):
+                        copied[idx] = last
+
+                    contents = os.listdir(c)
+                    contents = [os.path.join(c, cnt) for cnt in contents]
+                    copied.extend(contents)
+
+                copied = [c for c in copied if c.endswith(".txt")]
+                expect = [f for f in files if not f.endswith("bad.txt")]
+
+                to_delete = set()
+                found = {e : False for e in expect}
+                for e in expect:
+                    for idx, c in enumerate(copied):
+                        if c.endswith(e):
+                            to_delete.add(idx)
+                            found[e] = True
+
+                copied = [c for idx, c in enumerate(copied) if idx not in to_delete]
+
+                self.assertEqual(len(copied), 0)
+                print([k for k, v in found.items() if not v])
+                self.assertTrue(all(found.values()))

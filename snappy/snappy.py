@@ -1,4 +1,5 @@
 import os
+import re
 import datetime
 import shutil
 import hashlib
@@ -57,6 +58,12 @@ def create_snapshot(sources: list, destination: os.PathLike, rsync_args = None) 
         
         try:
             non_readable = _list_non_readable_files(src)
+            for idx, nr in enumerate(non_readable):
+                nr = re.sub(f"^{src}", "", nr)
+                if not nr.startswith(os.path.sep):
+                    nr = os.path.sep + nr
+
+                non_readable[idx] = nr
         except Exception as err:
             logger.error(f"There was an error when trying to find non-readable files in {src}")
             _log_error(str(err))
@@ -67,7 +74,7 @@ def create_snapshot(sources: list, destination: os.PathLike, rsync_args = None) 
             logger.info("-------------------")
             rsync_excl = exclude_from_rsync(non_readable)
             for rse in non_readable:
-                logger.warn(f"This file will be excluded from the backup: {rse}")
+                logger.warning(f"This file will be excluded from the backup: {rse}")
 
             output = rsync(src, dst, rsync_args + ["-av", "--delete"] + rsync_excl)
         except Exception as err:
@@ -187,7 +194,8 @@ def _log_rsync_error(cmd_output: subprocess.Popen) -> str:
     stdout = cmd_output.stdout.readlines()
     stderr = cmd_output.stderr.readlines()
     error_msg = stderr if stderr else stdout
-    _log_error(error_msg)
+    for msg in error_msg:
+        _log_error(msg)
 
     return error_msg
 

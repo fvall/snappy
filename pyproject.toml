@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "snappy"
-version = "0.1.5"
+version = "0.1.6"
 description = "A backup snapshot tool using rsync"
 authors = ["Felipe Valladão <felipe.valladao@gmail.com>"]
 license = "GPL-3-only"
