@@ -301,7 +301,7 @@ def cli():
 
 def _configure_logger(verbose = True) -> None:
     
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
     # -----------------
     #  Log to console
