@@ -35,3 +35,10 @@ def cp(src, dst, options = None):
 def mv(src, dst):
     args = _fs_cmd_args(src, dst)
     return shutil.move(args.src, args.dst)
+
+
+def find_non_readable(src):
+    options = ["-type", "f", "!", "-readable"]
+    args = _fs_cmd_args(src, "/", options)
+    cmd = ["find"] + [args.src] + args.options
+    return subprocess.run(cmd, capture_output = True)

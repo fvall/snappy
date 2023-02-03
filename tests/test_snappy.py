@@ -1,7 +1,9 @@
 import os
+import stat
 import unittest
 import tempfile
 import filecmp
+import unittest.mock
 from snappy import snappy as snp
 
 
@@ -74,6 +76,55 @@ class TestFolders(unittest.TestCase):
 
         for f in fl[size]:
             self.assertFalse(os.path.exists(os.path.join(self.folder.name, f)))
+
+    def test_list_non_readable_empty(self):
+
+        file = "a.txt"
+        with tempfile.TemporaryDirectory(dir = ".") as folder:
+            file = os.path.join(folder, file)
+            with open(file, "w") as f:
+                f.write("this is a file")
+
+            lst = snp._list_non_readable_files(folder)
+
+        self.assertEqual(len(lst), 0)
+        self.assertEqual(lst, [])
+
+    @unittest.mock.patch("snappy.cmd.find_non_readable")
+    def test_non_reabable_error(self, mock):
+        file = "error_file.txt"
+        mock.side_effect = Exception("NOT RUN")
+        with tempfile.TemporaryDirectory(dir = ".") as folder:
+            file = os.path.join(folder, file)
+            with open(file, "w") as f:
+                f.write("this is an error")
+
+            lst = snp._list_non_readable_files(folder)
+            self.assertEqual(len(lst), 0)
+            self.assertEqual(lst, [])
+
+    def test_non_readable_not_empty(self):
+
+        files = ["f1.txt", "f2.txt", "f3.txt"]
+        with tempfile.TemporaryDirectory(dir = ".") as folder:
+            for idx, file in enumerate(files):
+                file = os.path.join(folder, file)
+                with open(file, "w") as f:
+                    f.write(f"this is file {idx}")
+
+                if idx < 2:
+                    os.chmod(file, stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+                else:
+                    os.chmod(file, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+
+            lst = snp._list_non_readable_files(folder)
+
+            self.assertEqual(len(lst), 2)
+            for file in files[:2]:
+                file = os.path.join(folder, file)
+                file = os.path.abspath(file)
+                file = os.path.expanduser(file)
+                self.assertIn(file, lst)
 
 
 class TestCreateSnapshot(unittest.TestCase):

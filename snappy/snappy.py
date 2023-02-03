@@ -5,8 +5,15 @@ import hashlib
 import logging
 import subprocess
 
-from .rsync import NoRsyncError, RsyncError, is_rsync_installed, rsync
-from .cmd import mv
+from .rsync import (
+    NoRsyncError,
+    RsyncError,
+    is_rsync_installed,
+    rsync,
+    exclude_from_rsync,
+)
+
+from .cmd import mv, find_non_readable
 from . import utils as ut
 
 
@@ -49,9 +56,20 @@ def create_snapshot(sources: list, destination: os.PathLike, rsync_args = None) 
             raise FileNotFoundError(f"Location {src} cannot be found. Stopping snapshot creation.")
         
         try:
+            non_readable = _list_non_readable_files(src)
+        except Exception as err:
+            logger.error(f"There was an error when trying to find non-readable files in {src}")
+            _log_error(str(err))
+            raise RsyncError(str(err)) from err
+
+        try:
             logger.info("Showing rsync logs:")
             logger.info("-------------------")
-            output = rsync(src, dst, rsync_args + ["-av", "--delete"])
+            rsync_excl = exclude_from_rsync(non_readable)
+            for rse in non_readable:
+                logger.warn(f"This file will be excluded from the backup: {rse}")
+
+            output = rsync(src, dst, rsync_args + ["-av", "--delete"] + rsync_excl)
         except Exception as err:
 
             error_msg = _log_rsync_error(output)
@@ -154,6 +172,13 @@ def clean_backups(path: os.PathLike, n: int) -> None:
 # ---------------------
 
 
+def _log_error(error_msg):
+    msg = error_msg.split("\n")
+    for m in msg:
+        if (m != "") and (m != "\n") and (m != "\n\n"):
+            logger.error(m)
+
+
 def _log_rsync_error(cmd_output: subprocess.Popen) -> str:
 
     logger.error("There was an error when running the backup")
@@ -162,9 +187,27 @@ def _log_rsync_error(cmd_output: subprocess.Popen) -> str:
     stdout = cmd_output.stdout.readlines()
     stderr = cmd_output.stderr.readlines()
     error_msg = stderr if stderr else stdout
-    msg = error_msg.split("\n")
-    for m in msg:
-        if (m != "") and (m != "\n") and (m != "\n\n"):
-            logger.error(m)
+    _log_error(error_msg)
 
     return error_msg
+
+
+def _list_non_readable_files(src):
+
+    # - rsync cannot copy non-readable files so we try to identify
+    # - those and if so we automatically exclude them from the
+    # - rsync sources
+
+    out = find_non_readable(src)
+    if out.returncode != 0:
+        # - there was an error and hence we do not do anything
+        _log_error(out.stderr)
+        return []
+
+    if out.stdout is None:
+        return []
+
+    files = out.stdout.decode("utf-8").split("\n")
+    files = (f.strip() for f in files)
+    files = (f for f in files if f != "")
+    return list(files)

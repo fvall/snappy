@@ -3,6 +3,8 @@ import datetime
 import subprocess
 from subprocess import PIPE
 from .cmd import _fs_cmd_args
+from .utils import substitute_tilde
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +49,7 @@ def rsync(src, dst, options = None):
             break
 
     return out
+
+
+def exclude_from_rsync(src):
+    return [f"--exclude={substitute_tilde(s)}" for s in src]
